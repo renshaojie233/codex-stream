@@ -19,6 +19,8 @@ An unobtrusive floating keyboard button opens the Android IME and sends
 committed text (including composed Unicode text), Backspace, and Enter directly
 to Sunshine. Three-finger dragging owns the complete press/move/release
 sequence, while a stationary three-finger tap remains a keyboard shortcut.
+Two-finger taps are recognized independently from pointer ordering, which keeps
+secondary click reliable on Xiaomi/HyperOS while preserving two-finger scroll.
 
 On Xiaomi/Redmi tablets, the optional “Prioritize three-finger dragging” switch
 can temporarily disable HyperOS three-finger screenshot and split-screen

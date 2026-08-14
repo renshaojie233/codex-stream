@@ -107,6 +107,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private float threeFingerLastY;
     private double threeFingerDistanceMoved;
     private int threeFingerDragSlop;
+    private boolean twoFingerTapCandidate;
+    private boolean suppressTouchAfterTwoFingerTap;
+    private long twoFingerTapDownTime;
+    private float twoFingerStartX0;
+    private float twoFingerStartY0;
+    private float twoFingerStartX1;
+    private float twoFingerStartY1;
 
     private static final int REFERENCE_HORIZ_RES = 1280;
     private static final int REFERENCE_VERT_RES = 720;
@@ -118,6 +125,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private static final int STYLUS_UP_DEAD_ZONE_RADIUS = 50;
 
     private static final int THREE_FINGER_TAP_THRESHOLD = 500;
+    private static final int TWO_FINGER_TAP_THRESHOLD = 450;
 
     private ControllerHandler controllerHandler;
     private KeyboardTranslator keyboardTranslator;
@@ -1555,6 +1563,49 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         return total / event.getPointerCount();
     }
 
+    private void beginTwoFingerTapCandidate(MotionEvent event) {
+        twoFingerTapCandidate = true;
+        twoFingerTapDownTime = event.getEventTime();
+        twoFingerStartX0 = event.getX(0);
+        twoFingerStartY0 = event.getY(0);
+        twoFingerStartX1 = event.getX(1);
+        twoFingerStartY1 = event.getY(1);
+    }
+
+    private void updateTwoFingerTapCandidate(MotionEvent event) {
+        if (!twoFingerTapCandidate || event.getPointerCount() != 2) {
+            return;
+        }
+        float tolerance = threeFingerDragSlop;
+        if (Math.abs(event.getX(0) - twoFingerStartX0) > tolerance ||
+                Math.abs(event.getY(0) - twoFingerStartY0) > tolerance ||
+                Math.abs(event.getX(1) - twoFingerStartX1) > tolerance ||
+                Math.abs(event.getY(1) - twoFingerStartY1) > tolerance) {
+            twoFingerTapCandidate = false;
+        }
+    }
+
+    private boolean finishTwoFingerTapCandidate(MotionEvent event) {
+        boolean isTap = twoFingerTapCandidate &&
+                event.getEventTime() - twoFingerTapDownTime <= TWO_FINGER_TAP_THRESHOLD;
+        twoFingerTapCandidate = false;
+        if (!isTap) {
+            return false;
+        }
+
+        for (TouchContext touchContext : touchContextMap) {
+            touchContext.cancelTouch();
+        }
+        conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_RIGHT);
+        streamView.postDelayed(() -> {
+            if (conn != null) {
+                conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_RIGHT);
+            }
+        }, 100);
+        suppressTouchAfterTwoFingerTap = true;
+        return true;
+    }
+
     private float threeFingerCentroidY(MotionEvent event) {
         float total = 0;
         for (int i = 0; i < event.getPointerCount(); i++) {
@@ -1656,6 +1707,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         threeFingerGestureActive = false;
         threeFingerDragging = false;
         suppressTouchAfterThreeFingerGesture = false;
+        twoFingerTapCandidate = false;
+        suppressTouchAfterTwoFingerTap = false;
         threeFingerDownTime = 0;
     }
 
@@ -2171,6 +2224,17 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     yOffset = 0.f;
                 }
 
+                if (suppressTouchAfterTwoFingerTap) {
+                    if (event.getActionMasked() == MotionEvent.ACTION_UP ||
+                            event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                        suppressTouchAfterTwoFingerTap = false;
+                        for (TouchContext touchContext : touchContextMap) {
+                            touchContext.setPointerCount(0);
+                        }
+                    }
+                    return true;
+                }
+
                 if (suppressTouchAfterThreeFingerGesture) {
                     if (event.getActionMasked() == MotionEvent.ACTION_UP ||
                             event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
@@ -2188,8 +2252,25 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                 if (event.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN &&
                         event.getPointerCount() == 3) {
+                    twoFingerTapCandidate = false;
                     beginThreeFingerGesture(event);
                     return true;
+                }
+
+                if (event.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN &&
+                        event.getPointerCount() == 2) {
+                    beginTwoFingerTapCandidate(event);
+                }
+                else if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
+                    updateTwoFingerTapCandidate(event);
+                }
+                else if (event.getActionMasked() == MotionEvent.ACTION_POINTER_UP &&
+                        event.getPointerCount() == 2 && finishTwoFingerTapCandidate(event)) {
+                    return true;
+                }
+                else if (event.getActionMasked() == MotionEvent.ACTION_UP ||
+                        event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    twoFingerTapCandidate = false;
                 }
 
                 int actionIndex = event.getActionIndex();

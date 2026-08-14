@@ -2,6 +2,7 @@ package com.limelight.ui;
 
 import android.annotation.TargetApi;
 import android.content.Context;
+import android.os.SystemClock;
 import android.text.InputType;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
@@ -96,20 +97,54 @@ public class StreamView extends SurfaceView {
                 EditorInfo.IME_FLAG_NO_FULLSCREEN;
 
         return new BaseInputConnection(this, true) {
+            private long ignoreCleanupDeleteUntil;
+            private int ignoreCleanupDeleteLength;
+
             @Override
             public boolean commitText(CharSequence text, int newCursorPosition) {
                 if (inputCallbacks != null && text != null && text.length() > 0) {
                     inputCallbacks.handleCommittedText(text);
+                    ignoreCleanupDeleteLength = text.length();
+                    ignoreCleanupDeleteUntil = SystemClock.uptimeMillis() + 180;
                 }
-                return super.commitText(text, newCursorPosition);
+                // This view is a stateless conduit to the remote host. Calling
+                // BaseInputConnection here mutates a local editable and some
+                // Xiaomi IMEs immediately follow that mutation with a cleanup
+                // delete, which was being forwarded as a remote Backspace.
+                return true;
+            }
+
+            @Override
+            public boolean setComposingText(CharSequence text, int newCursorPosition) {
+                // Do not mirror transient Pinyin/IME composition to the host.
+                // The finalized text arrives through commitText().
+                return true;
+            }
+
+            @Override
+            public boolean setComposingRegion(int start, int end) {
+                return true;
+            }
+
+            @Override
+            public boolean finishComposingText() {
+                return true;
             }
 
             @Override
             public boolean deleteSurroundingText(int beforeLength, int afterLength) {
+                if (SystemClock.uptimeMillis() <= ignoreCleanupDeleteUntil &&
+                        beforeLength > 0 && beforeLength <= ignoreCleanupDeleteLength) {
+                    // Some IMEs delete their local composition buffer directly
+                    // after commitText(). It is not a user Backspace.
+                    ignoreCleanupDeleteUntil = 0;
+                    ignoreCleanupDeleteLength = 0;
+                    return true;
+                }
                 if (inputCallbacks != null && beforeLength > 0) {
                     inputCallbacks.handleBackspace(beforeLength);
                 }
-                return super.deleteSurroundingText(beforeLength, afterLength);
+                return true;
             }
 
             @Override
