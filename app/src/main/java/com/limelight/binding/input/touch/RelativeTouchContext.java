@@ -22,6 +22,9 @@ public class RelativeTouchContext implements TouchContext {
     private double xFactor, yFactor;
     private int pointerCount;
     private int maxPointerCountInGesture;
+    private long lastPrimaryTapUpTime;
+    private int lastPrimaryTapX;
+    private int lastPrimaryTapY;
 
     private final NvConnection conn;
     private final int actionIndex;
@@ -88,6 +91,8 @@ public class RelativeTouchContext implements TouchContext {
     private static final int TAP_DISTANCE_THRESHOLD = 25;
     private static final int TAP_TIME_THRESHOLD = 250;
     private static final int DRAG_TIME_THRESHOLD = 650;
+    private static final int DOUBLE_TAP_DRAG_TIME_THRESHOLD = 380;
+    private static final int DOUBLE_TAP_DRAG_DISTANCE_THRESHOLD = 48;
 
     private static final int SCROLL_SPEED_FACTOR = 5;
 
@@ -145,6 +150,16 @@ public class RelativeTouchContext implements TouchContext {
         }
     }
 
+    private boolean isSecondPrimaryTap(int eventX, int eventY, long eventTime) {
+        if (actionIndex != 0 || pointerCount != 1 || lastPrimaryTapUpTime == 0) {
+            return false;
+        }
+        long elapsed = eventTime - lastPrimaryTapUpTime;
+        return elapsed >= 0 && elapsed <= DOUBLE_TAP_DRAG_TIME_THRESHOLD &&
+                Math.abs(eventX - lastPrimaryTapX) <= DOUBLE_TAP_DRAG_DISTANCE_THRESHOLD &&
+                Math.abs(eventY - lastPrimaryTapY) <= DOUBLE_TAP_DRAG_DISTANCE_THRESHOLD;
+    }
+
     @Override
     public boolean touchDownEvent(int eventX, int eventY, long eventTime, boolean isNewFinger)
     {
@@ -162,8 +177,22 @@ public class RelativeTouchContext implements TouchContext {
             distanceMoved = 0;
 
             if (actionIndex == 0) {
-                // Start the timer for engaging a drag
-                startDragTimer();
+                if (isSecondPrimaryTap(eventX, eventY, eventTime)) {
+                    // Common touchpad behavior: tap once, then put the same
+                    // finger down again and move without lifting to drag.
+                    // Finish any still-pending release from the first tap so
+                    // the host receives a clean second press.
+                    Runnable buttonUpRunnable = buttonUpRunnables[MouseButtonPacket.BUTTON_LEFT - 1];
+                    handler.removeCallbacks(buttonUpRunnable);
+                    conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
+                    conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_LEFT);
+                    confirmedDrag = true;
+                    lastPrimaryTapUpTime = 0;
+                }
+                else {
+                    // Keep long-press-and-move as a secondary drag method.
+                    startDragTimer();
+                }
             }
         }
 
@@ -185,9 +214,21 @@ public class RelativeTouchContext implements TouchContext {
         if (confirmedDrag) {
             // Raise the button after a drag
             conn.sendMouseButtonUp(buttonIndex);
+            if (actionIndex == 0) {
+                lastPrimaryTapUpTime = 0;
+            }
         }
         else if (isTap(eventTime))
         {
+            if (actionIndex == 0 && maxPointerCountInGesture == 1) {
+                lastPrimaryTapUpTime = eventTime;
+                lastPrimaryTapX = eventX;
+                lastPrimaryTapY = eventY;
+            }
+            else if (actionIndex == 0) {
+                lastPrimaryTapUpTime = 0;
+            }
+
             // Lower the mouse button
             conn.sendMouseButtonDown(buttonIndex);
 
@@ -312,6 +353,9 @@ public class RelativeTouchContext implements TouchContext {
         // If it was a confirmed drag, we'll need to raise the button now
         if (confirmedDrag) {
             conn.sendMouseButtonUp(getMouseButtonIndex());
+            if (actionIndex == 0) {
+                lastPrimaryTapUpTime = 0;
+            }
         }
     }
 

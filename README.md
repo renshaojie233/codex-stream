@@ -9,9 +9,11 @@ automatic Sunshine pairing through each target's Tailscale-only gateway, and
 
 The dedicated launcher shows only Workstation, Agilex, and RSJ PC and each
 host exposes a single Desktop entry. Touch input follows a Mac-style trackpad
-layout: one finger moves the pointer, two fingers scroll, two-finger tap is
-right click, and holding three fingers while moving performs a drag. Streaming
-quality, frame rate, and bitrate remain adjustable in Settings.
+layout: one finger moves the pointer, two fingers scroll, and a two-finger tap
+is right click. For the most compatible drag gesture, tap once, touch down a
+second time, then move without lifting; long-press-and-move also drags. Optional
+three-finger dragging remains available but is not required. Streaming quality,
+frame rate, and bitrate remain adjustable in Settings.
 
 An unobtrusive floating keyboard button opens the Android IME and sends
 committed text (including composed Unicode text), Backspace, and Enter directly
