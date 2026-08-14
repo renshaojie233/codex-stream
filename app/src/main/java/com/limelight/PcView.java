@@ -178,6 +178,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             }
         });
 
+        // Codex Stream is a dedicated companion for the three managed hosts.
+        // Keep the launcher uncluttered and leave only streaming settings.
+        addComputerButton.setVisibility(View.GONE);
+        helpButton.setVisibility(View.GONE);
+
         // Amazon review didn't like the help button because the wiki was not entirely
         // navigable via the Fire TV remote (though the relevant parts were). Let's hide
         // it on Fire TV.
@@ -278,6 +283,9 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             managerBinder.startPolling(new ComputerManagerListener() {
                 @Override
                 public void notifyComputerUpdated(final ComputerDetails details) {
+                    if (!CodexPocketIntegration.isManagedComputer(details)) {
+                        return;
+                    }
                     if (!freezeUpdates) {
                         PcView.this.runOnUiThread(new Runnable() {
                             @Override

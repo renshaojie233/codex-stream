@@ -161,7 +161,14 @@ public class RelativeTouchContext implements TouchContext {
             cancelled = confirmedDrag = confirmedMove = confirmedScroll = false;
             distanceMoved = 0;
 
-            if (actionIndex == 0) {
+            if (pointerCount >= 3 && actionIndex == 2) {
+                // Match the macOS accessibility gesture: putting down the
+                // third finger immediately holds the left mouse button while
+                // the primary finger continues to move the pointer.
+                confirmedDrag = true;
+                conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_LEFT);
+            }
+            else if (actionIndex == 0) {
                 // Start the timer for engaging a drag
                 startDragTimer();
             }

@@ -7,6 +7,12 @@ automatic Sunshine pairing through each target's Tailscale-only gateway, and
 1080p/lowest-latency defaults. The Android package id is
 `com.codexpocket.stream`.
 
+The dedicated launcher shows only Workstation, Agilex, and RSJ PC and each
+host exposes a single Desktop entry. Touch input follows a Mac-style trackpad
+layout: one finger moves the pointer, two fingers scroll, two-finger tap is
+right click, and holding three fingers while moving performs a drag. Streaming
+quality, frame rate, and bitrate remain adjustable in Settings.
+
 This project is a GPL-3.0 fork of Moonlight Android. Upstream authors and the
 original project information are preserved below.
 

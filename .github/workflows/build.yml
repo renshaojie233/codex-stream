@@ -1,0 +1,27 @@
+name: Build Codex Stream
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Install Android toolchain
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;27.0.12077973"
+      - name: Build APK
+        run: ./gradlew --no-daemon assembleNonRootDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codex-stream-1.2.0
+          path: app/build/outputs/apk/nonRoot/debug/app-nonRoot-debug.apk
