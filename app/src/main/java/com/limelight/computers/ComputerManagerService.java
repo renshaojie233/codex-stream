@@ -290,6 +290,28 @@ public class ComputerManagerService extends Service {
             return null;
         }
 
+        public ComputerDetails getComputerByAddress(String address) {
+            if (address == null) {
+                return null;
+            }
+            synchronized (pollingTuples) {
+                for (PollingTuple tuple : pollingTuples) {
+                    ComputerDetails computer = tuple.computer;
+                    if (addressMatches(computer.activeAddress, address) ||
+                            addressMatches(computer.manualAddress, address) ||
+                            addressMatches(computer.localAddress, address) ||
+                            addressMatches(computer.remoteAddress, address)) {
+                        return computer;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private boolean addressMatches(ComputerDetails.AddressTuple tuple, String address) {
+            return tuple != null && address.equals(tuple.address);
+        }
+
         public void invalidateStateForComputer(String uuid) {
             synchronized (pollingTuples) {
                 for (PollingTuple tuple : pollingTuples) {

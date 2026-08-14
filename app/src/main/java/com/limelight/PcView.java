@@ -23,6 +23,7 @@ import com.limelight.preferences.StreamSettings;
 import com.limelight.ui.AdapterFragment;
 import com.limelight.ui.AdapterFragmentCallbacks;
 import com.limelight.utils.Dialog;
+import com.limelight.utils.CodexPocketIntegration;
 import com.limelight.utils.HelpLauncher;
 import com.limelight.utils.ServerHelper;
 import com.limelight.utils.ShortcutHelper;
@@ -65,6 +66,8 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     private ShortcutHelper shortcutHelper;
     private ComputerManagerService.ComputerManagerBinder managerBinder;
     private boolean freezeUpdates, runningPolling, inForeground, completeOnCreateCalled;
+    private String codexRequestedHost;
+    private boolean codexRequestedHostOpened;
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder binder) {
             final ComputerManagerService.ComputerManagerBinder localBinder =
@@ -79,6 +82,20 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
                     // Now make the binder visible
                     managerBinder = localBinder;
+
+                    if (codexRequestedHost != null &&
+                            localBinder.getComputerByAddress(codexRequestedHost) == null) {
+                        ComputerDetails details = new ComputerDetails();
+                        details.manualAddress = new ComputerDetails.AddressTuple(
+                                codexRequestedHost,
+                                NvHTTP.DEFAULT_HTTP_PORT
+                        );
+                        try {
+                            localBinder.addComputerBlocking(details);
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
 
                     // Start updates
                     startComputerUpdates();
@@ -186,6 +203,14 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        codexRequestedHost = getIntent().getStringExtra(CodexPocketIntegration.EXTRA_HOST);
+        CodexPocketIntegration.rememberHost(
+                this,
+                codexRequestedHost,
+                getIntent().getStringExtra(CodexPocketIntegration.EXTRA_TOKEN),
+                getIntent().getIntExtra(CodexPocketIntegration.EXTRA_GATEWAY_PORT, 8790)
+        );
+
         // Assume we're in the foreground when created to avoid a race
         // between binding to CMS and onResume()
         inForeground = true;
@@ -258,6 +283,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                             @Override
                             public void run() {
                                 updateComputer(details);
+                                maybeOpenCodexRequestedHost(details);
                             }
                         });
 
@@ -270,6 +296,27 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             });
             runningPolling = true;
         }
+    }
+
+    private void maybeOpenCodexRequestedHost(ComputerDetails computer) {
+        if (codexRequestedHostOpened || codexRequestedHost == null ||
+                computer.state != ComputerDetails.State.ONLINE ||
+                !computerMatchesHost(computer, codexRequestedHost)) {
+            return;
+        }
+        codexRequestedHostOpened = true;
+        if (computer.pairState == PairState.PAIRED) {
+            doAppList(computer, false, false);
+        } else {
+            doPair(computer);
+        }
+    }
+
+    private boolean computerMatchesHost(ComputerDetails computer, String host) {
+        return (computer.activeAddress != null && host.equals(computer.activeAddress.address)) ||
+                (computer.manualAddress != null && host.equals(computer.manualAddress.address)) ||
+                (computer.localAddress != null && host.equals(computer.localAddress.address)) ||
+                (computer.remoteAddress != null && host.equals(computer.remoteAddress.address));
     }
 
     private void stopComputerUpdates(boolean wait) {
@@ -423,6 +470,12 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                     }
                     else {
                         final String pinStr = PairingManager.generatePinString();
+
+                        CodexPocketIntegration.approvePairingAsync(
+                                PcView.this,
+                                computer,
+                                pinStr
+                        );
 
                         // Spin the dialog off in a thread because it blocks
                         Dialog.displayDialog(PcView.this, getResources().getString(R.string.pair_pairing_title),

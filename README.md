@@ -1,4 +1,16 @@
-# Moonlight Android
+# Codex Stream
+
+Codex Stream is the low-latency hardware streaming companion for
+[Codex Pocket](https://github.com/renshaojie233/codex-pocket). It keeps the
+Moonlight Android streaming core and adds authenticated one-tap host setup,
+automatic Sunshine pairing through each target's Tailscale-only gateway, and
+1080p/lowest-latency defaults. The Android package id is
+`com.codexpocket.stream`.
+
+This project is a GPL-3.0 fork of Moonlight Android. Upstream authors and the
+original project information are preserved below.
+
+## Upstream: Moonlight Android
 
 [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/232a8tadrrn8jv0k/branch/master?svg=true)](https://ci.appveyor.com/project/cgutman/moonlight-android/branch/master)
 [![Translation Status](https://hosted.weblate.org/widgets/moonlight/-/moonlight-android/svg-badge.svg)](https://hosted.weblate.org/projects/moonlight/moonlight-android/)

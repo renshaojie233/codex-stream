@@ -14,11 +14,13 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import com.limelight.binding.PlatformBinding;
 import com.limelight.computers.ComputerManagerService;
+import com.limelight.PcView;
 import com.limelight.R;
 import com.limelight.nvstream.http.ComputerDetails;
 import com.limelight.nvstream.http.NvHTTP;
 import com.limelight.nvstream.jni.MoonBridge;
 import com.limelight.utils.Dialog;
+import com.limelight.utils.CodexPocketIntegration;
 import com.limelight.utils.ServerHelper;
 import com.limelight.utils.SpinnerDialog;
 import com.limelight.utils.UiHelper;
@@ -43,10 +45,14 @@ public class AddComputerManually extends Activity {
     private ComputerManagerService.ComputerManagerBinder managerBinder;
     private final LinkedBlockingQueue<String> computersToAdd = new LinkedBlockingQueue<>();
     private Thread addThread;
+    private String integrationHost;
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, final IBinder binder) {
             managerBinder = ((ComputerManagerService.ComputerManagerBinder)binder);
             startAddThread();
+            if (integrationHost != null && !integrationHost.isEmpty()) {
+                computersToAdd.offer(integrationHost);
+            }
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -200,6 +206,9 @@ public class AddComputerManually extends Activity {
                 Toast.makeText(AddComputerManually.this, getResources().getString(R.string.addpc_success), Toast.LENGTH_LONG).show();
 
                 if (!isFinishing()) {
+                    if (integrationHost != null) {
+                        startActivity(new Intent(AddComputerManually.this, PcView.class));
+                    }
                     // Close the activity
                     AddComputerManually.this.finish();
                 }
@@ -275,6 +284,21 @@ public class AddComputerManually extends Activity {
         UiHelper.notifyNewRootView(this);
 
         this.hostText = findViewById(R.id.hostTextView);
+        integrationHost = getIntent().getStringExtra(CodexPocketIntegration.EXTRA_HOST);
+        String integrationToken = getIntent().getStringExtra(CodexPocketIntegration.EXTRA_TOKEN);
+        int gatewayPort = getIntent().getIntExtra(
+                CodexPocketIntegration.EXTRA_GATEWAY_PORT,
+                8790
+        );
+        if (integrationHost != null && !integrationHost.isEmpty()) {
+            hostText.setText(integrationHost);
+            CodexPocketIntegration.rememberHost(
+                    this,
+                    integrationHost,
+                    integrationToken,
+                    gatewayPort
+            );
+        }
         hostText.setImeOptions(EditorInfo.IME_ACTION_DONE);
         hostText.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
