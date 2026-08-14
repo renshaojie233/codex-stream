@@ -70,6 +70,8 @@ import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.View;
+import android.view.ViewConfiguration;
+import android.view.WindowInsets;
 import android.view.View.OnGenericMotionListener;
 import android.view.View.OnSystemUiVisibilityChangeListener;
 import android.view.View.OnTouchListener;
@@ -98,6 +100,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     // Only 2 touches are supported
     private final TouchContext[] touchContextMap = new TouchContext[2];
     private long threeFingerDownTime = 0;
+    private boolean threeFingerGestureActive;
+    private boolean threeFingerDragging;
+    private boolean suppressTouchAfterThreeFingerGesture;
+    private float threeFingerLastX;
+    private float threeFingerLastY;
+    private double threeFingerDistanceMoved;
+    private int threeFingerDragSlop;
 
     private static final int REFERENCE_HORIZ_RES = 1280;
     private static final int REFERENCE_VERT_RES = 720;
@@ -108,7 +117,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private static final int STYLUS_UP_DEAD_ZONE_DELAY = 150;
     private static final int STYLUS_UP_DEAD_ZONE_RADIUS = 50;
 
-    private static final int THREE_FINGER_TAP_THRESHOLD = 300;
+    private static final int THREE_FINGER_TAP_THRESHOLD = 500;
 
     private ControllerHandler controllerHandler;
     private KeyboardTranslator keyboardTranslator;
@@ -241,6 +250,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         streamView.setOnGenericMotionListener(this);
         streamView.setOnKeyListener(this);
         streamView.setInputCallbacks(this);
+        threeFingerDragSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+
+        View keyboardButton = findViewById(R.id.codexKeyboardButton);
+        keyboardButton.setOnClickListener(view -> toggleKeyboard());
 
         // Listen for touch events on the background touch view to enable trackpad mode
         // to work on areas outside of the StreamView itself. We use a separate View
@@ -1063,6 +1076,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @Override
     protected void onPause() {
+        releaseThreeFingerDrag();
         XiaomiGestureGuard.restore(this);
         if (isFinishing()) {
             // Stop any further input device notifications before we lose focus (and pointer capture)
@@ -1477,6 +1491,36 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         return true;
     }
 
+    @Override
+    public void handleCommittedText(CharSequence text) {
+        if (conn != null && text != null && text.length() > 0) {
+            conn.sendUtf8Text(text.toString());
+        }
+    }
+
+    @Override
+    public void handleBackspace(int count) {
+        for (int i = 0; i < Math.max(1, count); i++) {
+            sendImeKey(KeyEvent.KEYCODE_DEL);
+        }
+    }
+
+    @Override
+    public void handleEnter() {
+        sendImeKey(KeyEvent.KEYCODE_ENTER);
+    }
+
+    private void sendImeKey(int androidKeyCode) {
+        if (conn == null || keyboardTranslator == null) {
+            return;
+        }
+        short translated = keyboardTranslator.translate(androidKeyCode, -1);
+        if (translated != 0) {
+            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, (byte)0, (byte)0);
+            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, (byte)0, (byte)0);
+        }
+    }
+
     private TouchContext getTouchContext(int actionIndex)
     {
         if (actionIndex < touchContextMap.length) {
@@ -1490,8 +1534,133 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @Override
     public void toggleKeyboard() {
         LimeLog.info("Toggling keyboard overlay");
+        streamView.requestFocus();
         InputMethodManager inputManager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        inputManager.toggleSoftInput(0, 0);
+        streamView.post(() -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                    streamView.getWindowInsetsController() != null) {
+                streamView.getWindowInsetsController().show(WindowInsets.Type.ime());
+            }
+            else {
+                inputManager.showSoftInput(streamView, InputMethodManager.SHOW_IMPLICIT);
+            }
+        });
+    }
+
+    private float threeFingerCentroidX(MotionEvent event) {
+        float total = 0;
+        for (int i = 0; i < event.getPointerCount(); i++) {
+            total += event.getX(i);
+        }
+        return total / event.getPointerCount();
+    }
+
+    private float threeFingerCentroidY(MotionEvent event) {
+        float total = 0;
+        for (int i = 0; i < event.getPointerCount(); i++) {
+            total += event.getY(i);
+        }
+        return total / event.getPointerCount();
+    }
+
+    private void beginThreeFingerGesture(MotionEvent event) {
+        threeFingerGestureActive = true;
+        threeFingerDragging = false;
+        suppressTouchAfterThreeFingerGesture = false;
+        threeFingerDownTime = event.getEventTime();
+        threeFingerLastX = threeFingerCentroidX(event);
+        threeFingerLastY = threeFingerCentroidY(event);
+        threeFingerDistanceMoved = 0;
+        for (TouchContext touchContext : touchContextMap) {
+            touchContext.cancelTouch();
+        }
+    }
+
+    private boolean handleThreeFingerGesture(MotionEvent event) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_MOVE:
+                if (event.getPointerCount() < 3) {
+                    finishThreeFingerGesture(event.getEventTime(), false);
+                    suppressTouchAfterThreeFingerGesture = true;
+                    return true;
+                }
+                float centroidX = threeFingerCentroidX(event);
+                float centroidY = threeFingerCentroidY(event);
+                float rawDeltaX = centroidX - threeFingerLastX;
+                float rawDeltaY = centroidY - threeFingerLastY;
+                threeFingerDistanceMoved += Math.hypot(rawDeltaX, rawDeltaY);
+                threeFingerLastX = centroidX;
+                threeFingerLastY = centroidY;
+
+                if (!threeFingerDragging && threeFingerDistanceMoved >= threeFingerDragSlop) {
+                    threeFingerDragging = true;
+                    conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_LEFT);
+                }
+                if (threeFingerDragging && (rawDeltaX != 0 || rawDeltaY != 0)) {
+                    short deltaX = clampToShort(Math.round(
+                            rawDeltaX * REFERENCE_HORIZ_RES / Math.max(1, streamView.getWidth())
+                    ));
+                    short deltaY = clampToShort(Math.round(
+                            rawDeltaY * REFERENCE_VERT_RES / Math.max(1, streamView.getHeight())
+                    ));
+                    if (prefConfig.absoluteMouseMode) {
+                        conn.sendMouseMoveAsMousePosition(
+                                deltaX,
+                                deltaY,
+                                (short)streamView.getWidth(),
+                                (short)streamView.getHeight()
+                        );
+                    }
+                    else {
+                        conn.sendMouseMove(deltaX, deltaY);
+                    }
+                }
+                return true;
+
+            case MotionEvent.ACTION_POINTER_UP:
+                finishThreeFingerGesture(event.getEventTime(), true);
+                suppressTouchAfterThreeFingerGesture = true;
+                return true;
+
+            case MotionEvent.ACTION_UP:
+                finishThreeFingerGesture(event.getEventTime(), true);
+                return true;
+
+            case MotionEvent.ACTION_CANCEL:
+                finishThreeFingerGesture(event.getEventTime(), false);
+                return true;
+
+            default:
+                return true;
+        }
+    }
+
+    private void finishThreeFingerGesture(long eventTime, boolean allowKeyboard) {
+        boolean wasDragging = threeFingerDragging;
+        if (wasDragging && conn != null) {
+            conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
+        }
+        threeFingerGestureActive = false;
+        threeFingerDragging = false;
+        if (!wasDragging && allowKeyboard &&
+                eventTime - threeFingerDownTime <= THREE_FINGER_TAP_THRESHOLD) {
+            toggleKeyboard();
+        }
+        threeFingerDownTime = 0;
+    }
+
+    private void releaseThreeFingerDrag() {
+        if (threeFingerDragging && conn != null) {
+            conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
+        }
+        threeFingerGestureActive = false;
+        threeFingerDragging = false;
+        suppressTouchAfterThreeFingerGesture = false;
+        threeFingerDownTime = 0;
+    }
+
+    private short clampToShort(int value) {
+        return (short)Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, value));
     }
 
     private byte getLiTouchTypeFromEvent(MotionEvent event) {
@@ -2002,25 +2171,31 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     yOffset = 0.f;
                 }
 
+                if (suppressTouchAfterThreeFingerGesture) {
+                    if (event.getActionMasked() == MotionEvent.ACTION_UP ||
+                            event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                        suppressTouchAfterThreeFingerGesture = false;
+                        for (TouchContext touchContext : touchContextMap) {
+                            touchContext.setPointerCount(0);
+                        }
+                    }
+                    return true;
+                }
+
+                if (threeFingerGestureActive) {
+                    return handleThreeFingerGesture(event);
+                }
+
+                if (event.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN &&
+                        event.getPointerCount() == 3) {
+                    beginThreeFingerGesture(event);
+                    return true;
+                }
+
                 int actionIndex = event.getActionIndex();
 
                 int eventX = (int)(event.getX(actionIndex) + xOffset);
                 int eventY = (int)(event.getY(actionIndex) + yOffset);
-
-                // Special handling for 3 finger gesture
-                if (event.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN &&
-                        event.getPointerCount() == 3) {
-                    // Three fingers down
-                    threeFingerDownTime = event.getEventTime();
-
-                    // Cancel the first and second touches to avoid
-                    // erroneous events
-                    for (TouchContext aTouchContext : touchContextMap) {
-                        aTouchContext.cancelTouch();
-                    }
-
-                    return true;
-                }
 
                 // TODO: Re-enable native touch when have a better solution for handling
                 // cancelled touches from Android gestures and 3 finger taps to activate
@@ -2047,16 +2222,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     break;
                 case MotionEvent.ACTION_POINTER_UP:
                 case MotionEvent.ACTION_UP:
-                    if (event.getPointerCount() == 1 &&
-                            (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || (event.getFlags() & MotionEvent.FLAG_CANCELED) == 0)) {
-                        // All fingers up
-                        if (event.getEventTime() - threeFingerDownTime < THREE_FINGER_TAP_THRESHOLD) {
-                            // This is a 3 finger tap to bring up the keyboard
-                            toggleKeyboard();
-                            return true;
-                        }
-                    }
-
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && (event.getFlags() & MotionEvent.FLAG_CANCELED) != 0) {
                         context.cancelTouch();
                     }

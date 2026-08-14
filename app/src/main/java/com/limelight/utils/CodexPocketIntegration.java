@@ -142,10 +142,17 @@ public final class CodexPocketIntegration {
     }
 
     public static void approvePairingAsync(Context context, ComputerDetails computer, String pin) {
-        if (computer == null || computer.activeAddress == null || pin == null) {
+        if (computer == null || pin == null) {
             return;
         }
-        final String host = computer.activeAddress.address;
+        final String managedName = managedComputerName(computer);
+        final String managedHost = managedName == null ? null : MANAGED_HOST_BY_NAME.get(managedName);
+        final String host = managedHost != null
+                ? managedHost
+                : computer.activeAddress == null ? null : computer.activeAddress.address;
+        if (host == null || host.isEmpty()) {
+            return;
+        }
         final SharedPreferences preferences =
                 context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
         final String token = preferences.getString(

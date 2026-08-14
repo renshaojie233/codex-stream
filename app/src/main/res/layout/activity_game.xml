@@ -50,4 +50,18 @@
         android:preferKeepClear="true"
         android:visibility="gone" />
 
+    <ImageButton
+        android:id="@+id/codexKeyboardButton"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="end|bottom"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="22dp"
+        android:background="@drawable/codex_floating_button"
+        android:contentDescription="@string/codex_keyboard_button"
+        android:elevation="8dp"
+        android:padding="12dp"
+        android:src="@drawable/ic_keyboard"
+        android:tint="#FFFFFFFF" />
+
 </merge>

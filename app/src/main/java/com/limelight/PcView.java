@@ -3,6 +3,8 @@ package com.limelight;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.limelight.binding.PlatformBinding;
 import com.limelight.binding.crypto.AndroidCryptoProvider;
@@ -778,8 +780,8 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     }
     
     private void updateComputer(ComputerDetails details) {
-        ComputerObject existingEntry = null;
         ComputerObject sameManagedHostEntry = null;
+        List<ComputerObject> duplicateEntries = new ArrayList<>();
         String managedName = CodexPocketIntegration.managedComputerName(details);
         if (managedName == null) {
             return;
@@ -789,24 +791,32 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         for (int i = 0; i < pcGridAdapter.getCount(); i++) {
             ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(i);
 
-            // Check if this is the same computer
-            if (details.uuid.equals(computer.details.uuid)) {
-                existingEntry = computer;
-                break;
-            }
             if (managedName.equals(CodexPocketIntegration.managedComputerName(computer.details))) {
-                sameManagedHostEntry = computer;
+                if (sameManagedHostEntry == null) {
+                    sameManagedHostEntry = computer;
+                }
+                else if (CodexPocketIntegration.shouldReplaceManagedComputer(
+                        sameManagedHostEntry.details,
+                        computer.details
+                )) {
+                    duplicateEntries.add(sameManagedHostEntry);
+                    sameManagedHostEntry = computer;
+                }
+                else {
+                    duplicateEntries.add(computer);
+                }
             }
         }
 
-        if (existingEntry != null) {
-            // Replace the information in the existing entry
-            existingEntry.details = details;
+        for (ComputerObject duplicateEntry : duplicateEntries) {
+            pcGridAdapter.removeComputer(duplicateEntry);
         }
-        else if (sameManagedHostEntry != null) {
+
+        if (sameManagedHostEntry != null) {
             // Old discovery records can use a different UUID for the same physical PC.
             // Keep exactly one tile and prefer the online direct Tailscale record.
-            if (CodexPocketIntegration.shouldReplaceManagedComputer(
+            if (details.uuid.equals(sameManagedHostEntry.details.uuid) ||
+                    CodexPocketIntegration.shouldReplaceManagedComputer(
                     sameManagedHostEntry.details,
                     details
             )) {

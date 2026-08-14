@@ -13,6 +13,11 @@ layout: one finger moves the pointer, two fingers scroll, two-finger tap is
 right click, and holding three fingers while moving performs a drag. Streaming
 quality, frame rate, and bitrate remain adjustable in Settings.
 
+An unobtrusive floating keyboard button opens the Android IME and sends
+committed text (including composed Unicode text), Backspace, and Enter directly
+to Sunshine. Three-finger dragging owns the complete press/move/release
+sequence, while a stationary three-finger tap remains a keyboard shortcut.
+
 On Xiaomi/Redmi tablets, the optional “Prioritize three-finger dragging” switch
 can temporarily disable HyperOS three-finger screenshot and split-screen
 gestures only while a stream is active. The original system gesture values are
