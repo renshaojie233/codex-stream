@@ -28,6 +28,7 @@ import com.limelight.utils.HelpLauncher;
 import com.limelight.utils.ServerHelper;
 import com.limelight.utils.ShortcutHelper;
 import com.limelight.utils.UiHelper;
+import com.limelight.utils.XiaomiGestureGuard;
 
 import android.app.Activity;
 import android.app.ActivityManager;
@@ -357,6 +358,9 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     @Override
     protected void onResume() {
         super.onResume();
+
+        XiaomiGestureGuard.restoreAfterInterruptedStream(this);
+        XiaomiGestureGuard.promptForPermissionOnce(this);
 
         // Display a decoder crash notification if we've returned after a crash
         UiHelper.showDecoderCrashDialog(this);
@@ -776,6 +780,12 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     
     private void updateComputer(ComputerDetails details) {
         ComputerObject existingEntry = null;
+        ComputerObject sameManagedHostEntry = null;
+        String managedName = CodexPocketIntegration.managedComputerName(details);
+        if (managedName == null) {
+            return;
+        }
+        details.name = managedName;
 
         for (int i = 0; i < pcGridAdapter.getCount(); i++) {
             ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(i);
@@ -785,11 +795,24 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 existingEntry = computer;
                 break;
             }
+            if (managedName.equals(CodexPocketIntegration.managedComputerName(computer.details))) {
+                sameManagedHostEntry = computer;
+            }
         }
 
         if (existingEntry != null) {
             // Replace the information in the existing entry
             existingEntry.details = details;
+        }
+        else if (sameManagedHostEntry != null) {
+            // Old discovery records can use a different UUID for the same physical PC.
+            // Keep exactly one tile and prefer the online direct Tailscale record.
+            if (CodexPocketIntegration.shouldReplaceManagedComputer(
+                    sameManagedHostEntry.details,
+                    details
+            )) {
+                sameManagedHostEntry.details = details;
+            }
         }
         else {
             // Add a new entry

@@ -135,6 +135,11 @@
             android:summary="@string/summary_checkbox_touchscreen_trackpad"
             android:defaultValue="true" />
         <CheckBoxPreference
+            android:key="checkbox_xiaomi_three_finger_guard"
+            android:title="@string/title_checkbox_xiaomi_three_finger_guard"
+            android:summary="@string/summary_checkbox_xiaomi_three_finger_guard"
+            android:defaultValue="true" />
+        <CheckBoxPreference
             android:key="checkbox_mouse_nav_buttons"
             android:title="@string/title_checkbox_mouse_nav_buttons"
             android:summary="@string/summary_checkbox_mouse_nav_buttons"

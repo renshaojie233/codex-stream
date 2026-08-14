@@ -11,6 +11,7 @@ import android.os.Bundle;
 import android.app.Activity;
 import android.os.Handler;
 import android.os.Vibrator;
+import android.widget.Toast;
 import android.preference.CheckBoxPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
@@ -33,6 +34,7 @@ import com.limelight.R;
 import com.limelight.binding.video.MediaCodecHelper;
 import com.limelight.utils.Dialog;
 import com.limelight.utils.UiHelper;
+import com.limelight.utils.XiaomiGestureGuard;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -276,6 +278,23 @@ public class StreamSettings extends Activity {
 
             addPreferencesFromResource(R.xml.preferences);
             PreferenceScreen screen = getPreferenceScreen();
+
+            CheckBoxPreference xiaomiGesturePreference =
+                    (CheckBoxPreference) findPreference(XiaomiGestureGuard.PREFERENCE_KEY);
+            xiaomiGesturePreference.setOnPreferenceChangeListener((preference, enabled) -> {
+                if (Boolean.TRUE.equals(enabled) &&
+                        !XiaomiGestureGuard.canWriteSystemSettings(getActivity())) {
+                    Toast.makeText(
+                            getActivity(),
+                            R.string.toast_xiaomi_three_finger_permission,
+                            Toast.LENGTH_LONG
+                    ).show();
+                    XiaomiGestureGuard.requestPermission(getActivity());
+                } else if (Boolean.FALSE.equals(enabled)) {
+                    XiaomiGestureGuard.restore(getActivity());
+                }
+                return true;
+            });
 
             // hide on-screen controls category on non touch screen devices
             if (!getActivity().getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)) {

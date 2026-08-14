@@ -124,6 +124,9 @@
     <string name="category_input_settings">输入设置</string>
     <string name="title_checkbox_touchscreen_trackpad">将触控屏作为触控板使用</string>
     <string name="summary_checkbox_touchscreen_trackpad">如果启用，则将触控屏作为触控板使用。 如果禁止，则触控屏直接控制鼠标光标。</string>
+    <string name="title_checkbox_xiaomi_three_finger_guard">串流时优先使用三指拖动</string>
+    <string name="summary_checkbox_xiaomi_three_finger_guard">串流期间临时屏蔽小米/HyperOS 的三指截图、局部截图和分屏手势，退出串流后自动恢复。</string>
+    <string name="toast_xiaomi_three_finger_permission">请允许 Codex Stream 修改系统设置；仅用于串流期间临时屏蔽小米三指手势。</string>
     <string name="title_checkbox_multi_controller"> 自动检测手柄 </string>
     <string name="summary_checkbox_multi_controller"> 禁用此项所有手柄将视为一个手柄 </string>
     <string name="title_checkbox_vibrate_fallback"> 用设备震动模拟游戏震动效果 </string>

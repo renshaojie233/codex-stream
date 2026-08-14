@@ -11,7 +11,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 public final class CodexPocketIntegration {
@@ -28,9 +30,13 @@ public final class CodexPocketIntegration {
     private static final Set<String> MANAGED_NAMES = new HashSet<>(Arrays.asList(
             "Workstation", "Agilex", "RSJ PC"
     ));
-    private static final Set<String> MANAGED_HOSTS = new HashSet<>(Arrays.asList(
-            "100.115.211.82", "100.64.202.98", "100.77.122.104"
-    ));
+    private static final Map<String, String> MANAGED_HOST_BY_NAME = new HashMap<>();
+
+    static {
+        MANAGED_HOST_BY_NAME.put("Workstation", "100.115.211.82");
+        MANAGED_HOST_BY_NAME.put("Agilex", "100.64.202.98");
+        MANAGED_HOST_BY_NAME.put("RSJ PC", "100.77.122.104");
+    }
 
     private CodexPocketIntegration() {}
 
@@ -64,20 +70,64 @@ public final class CodexPocketIntegration {
     }
 
     public static boolean isManagedComputer(ComputerDetails computer) {
-        if (computer == null) {
-            return false;
-        }
-        if (computer.name != null && MANAGED_NAMES.contains(computer.name)) {
-            return true;
-        }
-        return addressIsManaged(computer.activeAddress) ||
-                addressIsManaged(computer.manualAddress) ||
-                addressIsManaged(computer.localAddress) ||
-                addressIsManaged(computer.remoteAddress);
+        return managedComputerName(computer) != null;
     }
 
-    private static boolean addressIsManaged(ComputerDetails.AddressTuple address) {
-        return address != null && MANAGED_HOSTS.contains(address.address);
+    public static String managedComputerName(ComputerDetails computer) {
+        if (computer == null) {
+            return null;
+        }
+        for (Map.Entry<String, String> managed : MANAGED_HOST_BY_NAME.entrySet()) {
+            if (computerHasAddress(computer, managed.getValue())) {
+                return managed.getKey();
+            }
+        }
+        if (computer.name != null && MANAGED_NAMES.contains(computer.name)) {
+            return computer.name;
+        }
+        return null;
+    }
+
+    public static boolean shouldReplaceManagedComputer(
+            ComputerDetails existing,
+            ComputerDetails candidate
+    ) {
+        return managedComputerScore(candidate) > managedComputerScore(existing);
+    }
+
+    private static int managedComputerScore(ComputerDetails computer) {
+        if (computer == null) {
+            return Integer.MIN_VALUE;
+        }
+        int score = 0;
+        String name = managedComputerName(computer);
+        String preferredHost = name == null ? null : MANAGED_HOST_BY_NAME.get(name);
+        if (preferredHost != null && computerHasAddress(computer, preferredHost)) {
+            score += 20;
+        }
+        if (computer.state == ComputerDetails.State.ONLINE) {
+            score += 100;
+        } else if (computer.state == ComputerDetails.State.UNKNOWN) {
+            score += 50;
+        }
+        if (computer.pairState == com.limelight.nvstream.http.PairingManager.PairState.PAIRED) {
+            score += 3;
+        }
+        if (computer.activeAddress != null) {
+            score += 1;
+        }
+        return score;
+    }
+
+    private static boolean computerHasAddress(ComputerDetails computer, String host) {
+        return addressMatches(computer.activeAddress, host) ||
+                addressMatches(computer.manualAddress, host) ||
+                addressMatches(computer.localAddress, host) ||
+                addressMatches(computer.remoteAddress, host);
+    }
+
+    private static boolean addressMatches(ComputerDetails.AddressTuple address, String host) {
+        return address != null && host.equals(address.address);
     }
 
     public static void approvePairingAsync(Context context, ComputerDetails computer, String pin) {

@@ -36,6 +36,7 @@ import com.limelight.utils.ServerHelper;
 import com.limelight.utils.ShortcutHelper;
 import com.limelight.utils.SpinnerDialog;
 import com.limelight.utils.UiHelper;
+import com.limelight.utils.XiaomiGestureGuard;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
@@ -1027,6 +1028,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @Override
     protected void onDestroy() {
+        XiaomiGestureGuard.restore(this);
         super.onDestroy();
 
         if (controllerHandler != null) {
@@ -1054,7 +1056,14 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        XiaomiGestureGuard.activate(this);
+    }
+
+    @Override
     protected void onPause() {
+        XiaomiGestureGuard.restore(this);
         if (isFinishing()) {
             // Stop any further input device notifications before we lose focus (and pointer capture)
             if (controllerHandler != null) {
