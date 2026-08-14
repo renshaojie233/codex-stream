@@ -23,5 +23,5 @@ jobs:
         run: ./gradlew --no-daemon assembleNonRootDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: codex-stream-1.3.4-unsigned
+          name: codex-stream-1.3.5-unsigned
           path: app/build/outputs/apk/nonRoot/debug/app-nonRoot-debug.apk

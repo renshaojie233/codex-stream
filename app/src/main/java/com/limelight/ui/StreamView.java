@@ -102,33 +102,33 @@ public class StreamView extends SurfaceView {
 
             @Override
             public boolean commitText(CharSequence text, int newCursorPosition) {
+                // Keep a real local editor buffer for the IME. Xiaomi's IME
+                // derives the committed candidate from this state and can
+                // emit an unrelated symbol if the composition is discarded.
+                boolean handled = super.commitText(text, newCursorPosition);
                 if (inputCallbacks != null && text != null && text.length() > 0) {
                     inputCallbacks.handleCommittedText(text);
                     ignoreCleanupDeleteLength = text.length();
                     ignoreCleanupDeleteUntil = SystemClock.uptimeMillis() + 180;
                 }
-                // This view is a stateless conduit to the remote host. Calling
-                // BaseInputConnection here mutates a local editable and some
-                // Xiaomi IMEs immediately follow that mutation with a cleanup
-                // delete, which was being forwarded as a remote Backspace.
-                return true;
+                return handled;
             }
 
             @Override
             public boolean setComposingText(CharSequence text, int newCursorPosition) {
-                // Do not mirror transient Pinyin/IME composition to the host.
-                // The finalized text arrives through commitText().
-                return true;
+                // Preserve transient Pinyin composition locally. Only the
+                // finalized candidate is forwarded by commitText().
+                return super.setComposingText(text, newCursorPosition);
             }
 
             @Override
             public boolean setComposingRegion(int start, int end) {
-                return true;
+                return super.setComposingRegion(start, end);
             }
 
             @Override
             public boolean finishComposingText() {
-                return true;
+                return super.finishComposingText();
             }
 
             @Override
@@ -139,12 +139,12 @@ public class StreamView extends SurfaceView {
                     // after commitText(). It is not a user Backspace.
                     ignoreCleanupDeleteUntil = 0;
                     ignoreCleanupDeleteLength = 0;
-                    return true;
+                    return super.deleteSurroundingText(beforeLength, afterLength);
                 }
                 if (inputCallbacks != null && beforeLength > 0) {
                     inputCallbacks.handleBackspace(beforeLength);
                 }
-                return true;
+                return super.deleteSurroundingText(beforeLength, afterLength);
             }
 
             @Override

@@ -2688,6 +2688,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @Override
     public void displayMessage(final String message) {
+        if (isSilentStreamLifecycleMessage(message)) {
+            return;
+        }
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -2698,6 +2701,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @Override
     public void displayTransientMessage(final String message) {
+        if (isSilentStreamLifecycleMessage(message)) {
+            return;
+        }
         if (!prefConfig.disableWarnings) {
             runOnUiThread(new Runnable() {
                 @Override
@@ -2706,6 +2712,18 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
             });
         }
+    }
+
+    private boolean isSilentStreamLifecycleMessage(String message) {
+        if (message == null) {
+            return false;
+        }
+
+        String normalized = message.trim().toLowerCase(Locale.ROOT);
+        return normalized.equals("stream started") ||
+                normalized.equals("stream resumed") ||
+                normalized.equals("stream paused") ||
+                normalized.equals("stream stopped");
     }
 
     @Override
