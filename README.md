@@ -13,11 +13,12 @@ layout: one finger moves the pointer, two fingers scroll, two-finger tap is
 right click, and holding three fingers while moving performs a drag. Streaming
 quality, frame rate, and bitrate remain adjustable in Settings.
 
-On Xiaomi/Redmi tablets, the “Prioritize three-finger dragging” switch can
-temporarily disable HyperOS three-finger screenshot and split-screen gestures
-only while a stream is active. The original system gesture values are restored
-when the stream closes. Android asks for “Modify system settings” once because
-these gestures are owned by HyperOS rather than the foreground app.
+On Xiaomi/Redmi tablets, the optional “Prioritize three-finger dragging” switch
+can temporarily disable HyperOS three-finger screenshot and split-screen
+gestures only while a stream is active. The original system gesture values are
+restored when the stream closes. Android asks for “Modify system settings” when
+the switch is enabled because these gestures are owned by HyperOS rather than
+the foreground app.
 
 This project is a GPL-3.0 fork of Moonlight Android. Upstream authors and the
 original project information are preserved below.

@@ -27,6 +27,7 @@ public final class CodexPocketIntegration {
     private static final String GLOBAL_TOKEN = "global-token";
     private static final String GLOBAL_PORT = "global-port";
     private static final String TRACKPAD_INITIALIZED = "mac-trackpad-initialized";
+    private static final String SAFE_GESTURE_DEFAULT_INITIALIZED = "safe-gesture-default-initialized";
     private static final Set<String> MANAGED_NAMES = new HashSet<>(Arrays.asList(
             "Workstation", "Agilex", "RSJ PC"
     ));
@@ -57,16 +58,26 @@ public final class CodexPocketIntegration {
     private static void configureMacTrackpadDefaults(Context context) {
         SharedPreferences integrationPreferences =
                 context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
-        if (integrationPreferences.getBoolean(TRACKPAD_INITIALIZED, false)) {
-            return;
+        SharedPreferences defaultPreferences = PreferenceManager.getDefaultSharedPreferences(context);
+        SharedPreferences.Editor integrationEditor = integrationPreferences.edit();
+        if (!integrationPreferences.getBoolean(TRACKPAD_INITIALIZED, false)) {
+            defaultPreferences
+                    .edit()
+                    .putBoolean("checkbox_touchscreen_trackpad", true)
+                    .putBoolean("checkbox_absolute_mouse_mode", false)
+                    .putBoolean("checkbox_show_onscreen_controls", false)
+                    .apply();
+            integrationEditor.putBoolean(TRACKPAD_INITIALIZED, true);
         }
-        PreferenceManager.getDefaultSharedPreferences(context)
-                .edit()
-                .putBoolean("checkbox_touchscreen_trackpad", true)
-                .putBoolean("checkbox_absolute_mouse_mode", false)
-                .putBoolean("checkbox_show_onscreen_controls", false)
-                .apply();
-        integrationPreferences.edit().putBoolean(TRACKPAD_INITIALIZED, true).apply();
+        if (!integrationPreferences.getBoolean(SAFE_GESTURE_DEFAULT_INITIALIZED, false)) {
+            // 1.3.0 prompted for system-setting access during app startup on some
+            // HyperOS builds. Reset the guard once so 1.3.1 always starts safely.
+            defaultPreferences.edit()
+                    .putBoolean(XiaomiGestureGuard.PREFERENCE_KEY, false)
+                    .apply();
+            integrationEditor.putBoolean(SAFE_GESTURE_DEFAULT_INITIALIZED, true);
+        }
+        integrationEditor.apply();
     }
 
     public static boolean isManagedComputer(ComputerDetails computer) {

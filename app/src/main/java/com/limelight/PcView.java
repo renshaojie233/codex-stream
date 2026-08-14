@@ -360,7 +360,6 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         super.onResume();
 
         XiaomiGestureGuard.restoreAfterInterruptedStream(this);
-        XiaomiGestureGuard.promptForPermissionOnce(this);
 
         // Display a decoder crash notification if we've returned after a crash
         UiHelper.showDecoderCrashDialog(this);

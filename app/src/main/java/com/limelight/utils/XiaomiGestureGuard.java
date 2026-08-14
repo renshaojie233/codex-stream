@@ -42,7 +42,7 @@ public final class XiaomiGestureGuard {
 
     public static boolean isEnabled(Context context) {
         return android.preference.PreferenceManager.getDefaultSharedPreferences(context)
-                .getBoolean(PREFERENCE_KEY, true);
+                .getBoolean(PREFERENCE_KEY, false);
     }
 
     public static boolean canWriteSystemSettings(Context context) {
@@ -108,7 +108,7 @@ public final class XiaomiGestureGuard {
                 }
             }
             return true;
-        } catch (SecurityException denied) {
+        } catch (RuntimeException denied) {
             restore(context);
             return false;
         }
@@ -124,7 +124,7 @@ public final class XiaomiGestureGuard {
             String original = wasPresent ? state.getString(ORIGINAL_VALUE_PREFIX + key, null) : null;
             try {
                 Settings.System.putString(context.getContentResolver(), key, original);
-            } catch (SecurityException ignored) {
+            } catch (RuntimeException ignored) {
                 return;
             }
         }
