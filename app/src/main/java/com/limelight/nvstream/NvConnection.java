@@ -580,8 +580,18 @@ public class NvConnection {
     }
 
     public void sendUtf8Text(final String text) {
-        if (!isMonkey) {
-            MoonBridge.sendUtf8Text(text);
+        if (!isMonkey && text != null) {
+            // Sunshine's Linux backend enters Unicode with Ctrl+Shift+U and
+            // converts one packet into one code point. If a committed IME
+            // candidate contains multiple characters, Sunshine concatenates
+            // all hexadecimal code points and produces invalid keyboard input.
+            // Keep surrogate pairs intact while sending exactly one Unicode
+            // code point in each packet.
+            for (int offset = 0; offset < text.length();) {
+                int codePoint = text.codePointAt(offset);
+                MoonBridge.sendUtf8Text(new String(Character.toChars(codePoint)));
+                offset += Character.charCount(codePoint);
+            }
         }
     }
 

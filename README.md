@@ -19,6 +19,9 @@ An unobtrusive floating keyboard button opens the Android IME and sends
 committed text (including composed Unicode text), Backspace, and Enter directly
 to Sunshine. The local editor retains Pinyin composition state until a candidate
 is committed, while IME cleanup deletes are not forwarded as remote Backspace.
+Committed strings are split on Unicode code-point boundaries because Sunshine's
+Linux backend accepts exactly one code point per Unicode input packet; this also
+keeps emoji surrogate pairs intact.
 Routine stream start, resume, pause, and stop messages stay silent. Three-finger
 dragging owns the complete press/move/release
 sequence, while a stationary three-finger tap remains a keyboard shortcut.
