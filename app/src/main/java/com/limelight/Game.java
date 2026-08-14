@@ -32,6 +32,7 @@ import com.limelight.preferences.PreferenceConfiguration;
 import com.limelight.ui.GameGestures;
 import com.limelight.ui.StreamView;
 import com.limelight.utils.Dialog;
+import com.limelight.utils.CodexPocketIntegration;
 import com.limelight.utils.ServerHelper;
 import com.limelight.utils.ShortcutHelper;
 import com.limelight.utils.SpinnerDialog;
@@ -1495,14 +1496,32 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             return false;
         }
 
-        conn.sendUtf8Text(event.getCharacters());
+        sendCommittedText(event.getCharacters());
         return true;
     }
 
     @Override
     public void handleCommittedText(CharSequence text) {
         if (conn != null && text != null && text.length() > 0) {
-            conn.sendUtf8Text(text.toString());
+            sendCommittedText(text.toString());
+        }
+    }
+
+    private void sendCommittedText(String text) {
+        if (conn == null || text == null || text.isEmpty()) {
+            return;
+        }
+        if (!CodexPocketIntegration.sendCommittedTextAsync(
+                this,
+                pcName,
+                text,
+                () -> runOnUiThread(() -> Toast.makeText(
+                        Game.this,
+                        "文字未送达，请检查目标电脑连接",
+                        Toast.LENGTH_SHORT
+                ).show())
+        )) {
+            conn.sendUtf8Text(text);
         }
     }
 

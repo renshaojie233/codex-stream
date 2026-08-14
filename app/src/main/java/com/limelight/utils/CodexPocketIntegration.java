@@ -6,6 +6,8 @@ import android.preference.PreferenceManager;
 
 import com.limelight.nvstream.http.ComputerDetails;
 
+import org.json.JSONObject;
+
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -15,6 +17,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public final class CodexPocketIntegration {
     public static final String EXTRA_HOST = "com.codexpocket.stream.extra.HOST";
@@ -32,6 +36,12 @@ public final class CodexPocketIntegration {
             "Workstation", "Agilex", "RSJ PC"
     ));
     private static final Map<String, String> MANAGED_HOST_BY_NAME = new HashMap<>();
+    private static final ExecutorService TEXT_DELIVERY_EXECUTOR =
+            Executors.newSingleThreadExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "Codex Stream text delivery");
+                thread.setDaemon(true);
+                return thread;
+            });
 
     static {
         MANAGED_HOST_BY_NAME.put("Workstation", "100.115.211.82");
@@ -188,6 +198,72 @@ public final class CodexPocketIntegration {
         }, "Codex Stream pairing approval");
         thread.setDaemon(true);
         thread.start();
+    }
+
+    public static boolean sendCommittedTextAsync(
+            Context context,
+            String computerName,
+            String text,
+            Runnable failureCallback
+    ) {
+        final String host = MANAGED_HOST_BY_NAME.get(computerName);
+        if (host == null || text == null || text.isEmpty()) {
+            return false;
+        }
+        final SharedPreferences preferences =
+                context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE);
+        final String token = preferences.getString(
+                TOKEN_PREFIX + host,
+                preferences.getString(GLOBAL_TOKEN, null)
+        );
+        final int port = preferences.getInt(
+                PORT_PREFIX + host,
+                preferences.getInt(GLOBAL_PORT, 8790)
+        );
+        if (token == null || token.isEmpty()) {
+            return false;
+        }
+
+        TEXT_DELIVERY_EXECUTOR.execute(() -> {
+            try {
+                if (!postCommittedText(host, port, token, text) && failureCallback != null) {
+                    failureCallback.run();
+                }
+            } catch (Exception ignored) {
+                if (failureCallback != null) {
+                    failureCallback.run();
+                }
+            }
+        });
+        return true;
+    }
+
+    private static boolean postCommittedText(
+            String host,
+            int port,
+            String token,
+            String text
+    ) throws Exception {
+        URL endpoint = new URL("http", host, port, "/remote/extreme/text");
+        HttpURLConnection connection = (HttpURLConnection) endpoint.openConnection();
+        connection.setConnectTimeout(2_500);
+        connection.setReadTimeout(2_500);
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Authorization", "Bearer " + token);
+        connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        connection.setDoOutput(true);
+        byte[] payload = new JSONObject().put("text", text).toString()
+                .getBytes(StandardCharsets.UTF_8);
+        connection.setFixedLengthStreamingMode(payload.length);
+        try {
+            try (OutputStream output = connection.getOutputStream()) {
+                output.write(payload);
+            }
+            int status = connection.getResponseCode();
+            return status >= 200 && status < 300;
+        } finally {
+            connection.disconnect();
+        }
     }
 
     private static boolean postPairingApproval(

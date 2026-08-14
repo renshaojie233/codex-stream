@@ -16,12 +16,13 @@ three-finger dragging remains available but is not required. Streaming quality,
 frame rate, and bitrate remain adjustable in Settings.
 
 An unobtrusive floating keyboard button opens the Android IME and sends
-committed text (including composed Unicode text), Backspace, and Enter directly
-to Sunshine. The local editor retains Pinyin composition state until a candidate
-is committed, while IME cleanup deletes are not forwarded as remote Backspace.
-Committed strings are split on Unicode code-point boundaries because Sunshine's
-Linux backend accepts exactly one code point per Unicode input packet; this also
-keeps emoji surrogate pairs intact.
+committed text (including composed Unicode text), Backspace, and Enter to the
+remote desktop. For the three managed Linux hosts, committed strings use the
+authenticated Tailscale-only gateway and are pasted as exact UTF-8, bypassing
+Sunshine's Linux Unicode key emulation and the host IME. Other hosts retain the
+standard Moonlight/Sunshine input path. The local editor keeps Pinyin composition
+state until a candidate is committed, while IME cleanup deletes are not forwarded
+as remote Backspace.
 Routine stream start, resume, pause, and stop messages stay silent. Three-finger
 dragging owns the complete press/move/release
 sequence, while a stationary three-finger tap remains a keyboard shortcut.
