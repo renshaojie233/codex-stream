@@ -650,6 +650,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         i.putExtra(AppView.UUID_EXTRA, computer.uuid);
         i.putExtra(AppView.NEW_PAIR_EXTRA, newlyPaired);
         i.putExtra(AppView.SHOW_HIDDEN_APPS_EXTRA, showHiddenGames);
+        i.putExtra(AppView.AUTO_START_DESKTOP_EXTRA, codexRequestedHost != null);
         startActivity(i);
     }
 

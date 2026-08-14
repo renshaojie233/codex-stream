@@ -62,6 +62,8 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
     private boolean suspendGridUpdates;
     private boolean inForeground;
     private boolean showHiddenApps;
+    private boolean autoStartDesktop;
+    private boolean autoStartDesktopAttempted;
     private HashSet<Integer> hiddenAppIds = new HashSet<>();
 
     private final static int START_OR_RESUME_ID = 1;
@@ -77,6 +79,7 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
     public final static String UUID_EXTRA = "UUID";
     public final static String NEW_PAIR_EXTRA = "NewPair";
     public final static String SHOW_HIDDEN_APPS_EXTRA = "ShowHiddenApps";
+    public final static String AUTO_START_DESKTOP_EXTRA = "CodexPocketAutoStartDesktop";
 
     private ComputerManagerService.ComputerManagerBinder managerBinder;
     private final ServiceConnection serviceConnection = new ServiceConnection() {
@@ -301,6 +304,7 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
         UiHelper.notifyNewRootView(this);
 
         showHiddenApps = getIntent().getBooleanExtra(SHOW_HIDDEN_APPS_EXTRA, false);
+        autoStartDesktop = getIntent().getBooleanExtra(AUTO_START_DESKTOP_EXTRA, false);
         uuidString = getIntent().getStringExtra(UUID_EXTRA);
 
         SharedPreferences hiddenAppsPrefs = getSharedPreferences(HIDDEN_APPS_PREF_FILENAME, MODE_PRIVATE);
@@ -539,6 +543,7 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                 if (updated) {
                     appGridAdapter.notifyDataSetChanged();
                 }
+
             }
         });
     }
@@ -612,6 +617,16 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
 
                 if (updated) {
                     appGridAdapter.notifyDataSetChanged();
+                }
+
+                if (autoStartDesktop && !autoStartDesktopAttempted && managerBinder != null) {
+                    for (NvApp app : appList) {
+                        if ("desktop".equalsIgnoreCase(app.getAppName())) {
+                            autoStartDesktopAttempted = true;
+                            ServerHelper.doStart(AppView.this, app, computer, managerBinder);
+                            break;
+                        }
+                    }
                 }
             }
         });
