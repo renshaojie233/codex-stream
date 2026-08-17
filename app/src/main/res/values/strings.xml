@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="codex_keyboard_button">Open remote keyboard</string>
+    <string name="codex_keyboard_button">Open remote special keys; hold for keyboard</string>
     <!-- Shortcut strings -->
     <string name="scut_deleted_pc">PC deleted</string>
     <string name="scut_not_paired">PC not paired</string>

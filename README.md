@@ -15,7 +15,9 @@ second time, then move without lifting; long-press-and-move also drags. Optional
 three-finger dragging remains available but is not required. Streaming quality,
 frame rate, and bitrate remain adjustable in Settings.
 
-An unobtrusive floating keyboard button opens the Android IME and sends
+An unobtrusive floating keyboard button opens a compact special-key panel with
+arrow keys, Esc, Tab, Enter, Ctrl+C, and Ctrl+L. Holding the button opens the
+Android IME. The IME sends
 committed text (including composed Unicode text), Backspace, and Enter to the
 remote desktop. For the three managed Linux hosts, committed strings use the
 authenticated Tailscale-only gateway and are pasted as exact UTF-8, bypassing

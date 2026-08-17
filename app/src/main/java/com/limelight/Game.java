@@ -52,8 +52,11 @@ import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.hardware.input.InputManager;
 import android.media.AudioManager;
 import android.net.ConnectivityManager;
@@ -64,6 +67,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.util.Rational;
 import android.view.Display;
+import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
@@ -79,6 +83,8 @@ import android.view.View.OnTouchListener;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.PopupWindow;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -156,6 +162,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private boolean waitingForAllModifiersUp = false;
     private int specialKeyCode = KeyEvent.KEYCODE_UNKNOWN;
     private StreamView streamView;
+    private PopupWindow specialKeysPopup;
     private long lastAbsTouchUpTime = 0;
     private long lastAbsTouchDownTime = 0;
     private float lastAbsTouchUpX, lastAbsTouchUpY;
@@ -262,7 +269,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         threeFingerDragSlop = ViewConfiguration.get(this).getScaledTouchSlop();
 
         View keyboardButton = findViewById(R.id.codexKeyboardButton);
-        keyboardButton.setOnClickListener(view -> toggleKeyboard());
+        keyboardButton.setOnClickListener(this::toggleSpecialKeys);
+        keyboardButton.setOnLongClickListener(view -> {
+            toggleKeyboard();
+            return true;
+        });
 
         // Listen for touch events on the background touch view to enable trackpad mode
         // to work on areas outside of the StreamView itself. We use a separate View
@@ -1051,6 +1062,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @Override
     protected void onDestroy() {
         XiaomiGestureGuard.restore(this);
+        if (specialKeysPopup != null) {
+            specialKeysPopup.dismiss();
+            specialKeysPopup = null;
+        }
         super.onDestroy();
 
         if (controllerHandler != null) {
@@ -1538,14 +1553,100 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     }
 
     private void sendImeKey(int androidKeyCode) {
+        sendImeKey(androidKeyCode, (byte)0);
+    }
+
+    private void sendImeKey(int androidKeyCode, byte modifiers) {
         if (conn == null || keyboardTranslator == null) {
             return;
         }
         short translated = keyboardTranslator.translate(androidKeyCode, -1);
         if (translated != 0) {
-            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, (byte)0, (byte)0);
-            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, (byte)0, (byte)0);
+            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, modifiers, (byte)0);
+            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, modifiers, (byte)0);
         }
+    }
+
+    private int overlayDp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private GradientDrawable overlayBackground(int color, float radiusDp, int strokeColor) {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(color);
+        background.setCornerRadius(overlayDp(Math.round(radiusDp)));
+        if (strokeColor != Color.TRANSPARENT) {
+            background.setStroke(overlayDp(1), strokeColor);
+        }
+        return background;
+    }
+
+    private LinearLayout specialKeyRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+        return row;
+    }
+
+    private TextView specialKeyButton(String label, View.OnClickListener listener) {
+        TextView button = new TextView(this);
+        button.setText(label);
+        button.setTextColor(Color.WHITE);
+        button.setTextSize(14);
+        button.setGravity(Gravity.CENTER);
+        button.setContentDescription(label);
+        button.setBackground(overlayBackground(0x2EFFFFFF, 11, 0x30FFFFFF));
+        button.setOnClickListener(listener);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(overlayDp(58), overlayDp(42));
+        params.setMargins(overlayDp(3), overlayDp(3), overlayDp(3), overlayDp(3));
+        button.setLayoutParams(params);
+        return button;
+    }
+
+    private void toggleSpecialKeys(View anchor) {
+        if (specialKeysPopup != null && specialKeysPopup.isShowing()) {
+            specialKeysPopup.dismiss();
+            return;
+        }
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER);
+        panel.setPadding(overlayDp(6), overlayDp(6), overlayDp(6), overlayDp(6));
+        panel.setBackground(overlayBackground(0xF01C1D24, 16, 0x44FFFFFF));
+
+        LinearLayout commands = specialKeyRow();
+        commands.addView(specialKeyButton("键盘", view -> {
+            specialKeysPopup.dismiss();
+            toggleKeyboard();
+        }));
+        commands.addView(specialKeyButton("Esc", view -> sendImeKey(KeyEvent.KEYCODE_ESCAPE)));
+        commands.addView(specialKeyButton("Tab", view -> sendImeKey(KeyEvent.KEYCODE_TAB)));
+        commands.addView(specialKeyButton("Ctrl+C", view ->
+                sendImeKey(KeyEvent.KEYCODE_C, KeyboardPacket.MODIFIER_CTRL)));
+        commands.addView(specialKeyButton("Ctrl+L", view ->
+                sendImeKey(KeyEvent.KEYCODE_L, KeyboardPacket.MODIFIER_CTRL)));
+
+        LinearLayout navigation = specialKeyRow();
+        navigation.addView(specialKeyButton("←", view -> sendImeKey(KeyEvent.KEYCODE_DPAD_LEFT)));
+        navigation.addView(specialKeyButton("↑", view -> sendImeKey(KeyEvent.KEYCODE_DPAD_UP)));
+        navigation.addView(specialKeyButton("↓", view -> sendImeKey(KeyEvent.KEYCODE_DPAD_DOWN)));
+        navigation.addView(specialKeyButton("→", view -> sendImeKey(KeyEvent.KEYCODE_DPAD_RIGHT)));
+        navigation.addView(specialKeyButton("Enter", view -> sendImeKey(KeyEvent.KEYCODE_ENTER)));
+        panel.addView(commands);
+        panel.addView(navigation);
+
+        specialKeysPopup = new PopupWindow(
+                panel,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                false
+        );
+        specialKeysPopup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        specialKeysPopup.setOutsideTouchable(true);
+        specialKeysPopup.setElevation(overlayDp(12));
+        specialKeysPopup.setOnDismissListener(() -> specialKeysPopup = null);
+        specialKeysPopup.showAtLocation(anchor, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, overlayDp(76));
     }
 
     private TouchContext getTouchContext(int actionIndex)

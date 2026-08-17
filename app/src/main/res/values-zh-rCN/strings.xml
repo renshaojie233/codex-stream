@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="codex_keyboard_button">打开远程键盘</string>
+    <string name="codex_keyboard_button">打开远程特殊按键；长按打开键盘</string>
     <!-- Shortcut strings -->
     <string name="scut_deleted_pc"> 电脑已删除 </string>
     <string name="scut_not_paired"> 电脑未配对 </string>
